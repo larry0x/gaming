@@ -63,8 +63,12 @@
   nixpkgs.config.allowUnfreePredicate =
     pkg:
     builtins.elem (lib.getName pkg) [
-      "steam" # the Filesystem Hierarchy Standard (FHS) sandbox the client runs in (the `steam` command)
-      "steam-unwrapped" # Valve's proprietary client itself, mounted inside the sandbox
+      # The Filesystem Hierarchy Standard (FHS) sandbox the client runs in
+      # (the `steam` command).
+      "steam"
+
+      # Valve's proprietary client itself, mounted inside the sandbox.
+      "steam-unwrapped"
     ];
 
   # The NixOS release this machine was FIRST installed with; *not* "the version
@@ -184,13 +188,18 @@
   users.users.larry = {
     isNormalUser = true;
     extraGroups = [ "wheel" ]; # sudo
+
     # TTY login password. CHANGE THIS after first boot with `passwd`, or
     # replace with hashedPassword (generate one via `mkpasswd -m sha-512`).
     initialPassword = "changeme";
+
     # SSH public keys allowed to log in as this user. Managed declaratively:
     # written to /etc/ssh/authorized_keys.d/larry, not ~/.ssh/authorized_keys.
     openssh.authorizedKeys.keys = [
+      # larry_yubikey_082.pub
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF0WGLelGJfREUvxlyGW26jJvOte2sodtcYkXnhmo0RY openpgp:0xE1D94862"
+
+      # larry_yubikey_093.pub
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPp84hGfIow1NeLZCJOo2voxJWyCgoJA9QA3cWufF7bA openpgp:0x0854DE69"
     ];
   };
