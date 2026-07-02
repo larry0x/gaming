@@ -21,7 +21,7 @@
 # TODO(larry): grep for "TODO" -- hostname, user password, GPU driver, WiFi,
 # Bluetooth, and Tailscale are placeholders pending details.
 
-{ config, lib, pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   imports = [
@@ -33,7 +33,10 @@
   time.timeZone = "UTC";
 
   # Makes these packages' commands available in every user's shell.
-  environment.systemPackages = with pkgs; [ vim git ];
+  environment.systemPackages = with pkgs; [
+    git
+    vim
+  ];
 
   # Remote administration from another machine, so this box never needs more
   # than a TTY. This one option brings the sshd binary, its systemd unit, and
@@ -60,7 +63,7 @@
   nixpkgs.config.allowUnfreePredicate =
     pkg:
     builtins.elem (lib.getName pkg) [
-      "steam"           # the Filesystem Hierarchy Standard (FHS) sandbox the client runs in (the `steam` command)
+      "steam" # the Filesystem Hierarchy Standard (FHS) sandbox the client runs in (the `steam` command)
       "steam-unwrapped" # Valve's proprietary client itself, mounted inside the sandbox
     ];
 
@@ -74,13 +77,19 @@
 
   #### Boot ####################################################################
 
-  # Assumes UEFI. For legacy BIOS, use boot.loader.grub instead.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.systemd-boot.configurationLimit = 10;
-  boot.loader.efi.canTouchEfiVariables = true;
+  boot = {
+    # Assumes UEFI. For legacy BIOS, use boot.loader.grub instead.
+    loader = {
+      systemd-boot = {
+        enable = true;
+        configurationLimit = 10;
+      };
+      efi.canTouchEfiVariables = true;
+    };
 
-  # Latest kernel for best support of recent GPUs and controllers.
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+    # Latest kernel for best support of recent GPUs and controllers.
+    kernelPackages = pkgs.linuxPackages_latest;
+  };
 
   #### Hardware ################################################################
 

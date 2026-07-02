@@ -1,2 +1,7 @@
 # NixOS installer image
 image/
+
+# The real hardware-configuration.nix is generated on, and lives on, the
+# machine. CI (and local eval checks) copy ci/hardware-configuration-stub.nix
+# to this path temporarily.
+/hardware-configuration.nix

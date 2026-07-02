@@ -1,0 +1,32 @@
+name: Nix
+
+on: push
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Nix, with <nixpkgs> pointing at the same channel the machine
+      # tracks, so CI and the box evaluate the exact same package set.
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-26.05
+
+      - name: statix (anti-pattern lints)
+        run: nix-shell -p statix --run 'statix check .'
+
+      - name: deadnix (dead code)
+        run: nix-shell -p deadnix --run 'deadnix --fail .'
+
+      - name: nixfmt (format check)
+        run: nix-shell -p nixfmt --run "git ls-files '*.nix' | xargs nixfmt --check"
+
+      # The real type check: evaluate the whole NixOS system. Catches options
+      # that do not exist (typos) and values of the wrong type. The stub
+      # stands in for the hardware-configuration.nix generated on the machine.
+      - name: eval (NixOS option type check)
+        run: |
+          cp ci/hardware-configuration-stub.nix hardware-configuration.nix
+          nix-instantiate '<nixpkgs/nixos>' -A system --arg configuration ./configuration.nix
