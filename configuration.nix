@@ -216,13 +216,56 @@
 
   #### Audio ###################################################################
 
+  # Linux audio is layered:
+  #
+  # - ALSA: the kernel layer -- drivers for the sound hardware, plus a thin
+  #   userspace API. Makes sound, but is bad at sharing: essentially one app(*)
+  #   per device.
+  # - PulseAudio: a protocol that defines how apps talk to a userspace sound
+  #   server, which mixes many apps' streams onto one device.
+  # - PipeWire: the modern implementation of the PulseAudio protocol. It also
+  #   re-implements the ALSA userspace API, catching apps that talk ALSA
+  #   directly.
+  #
+  # game (64- or 32-bit)
+  #   │  speaks PulseAudio protocol (most) or ALSA API (some)
+  #   ▼
+  # PipeWire ──── rtkit grants its threads realtime priority
+  #   ▼
+  # ALSA kernel drivers ──▶ HDMI/DP audio via the GPU, or the Realtek jacks
+  #
+  # (*): Linux abstracts an audio device as a file, /dev/snd/pcmXXXX. To play
+  #    sound, a program open()s that file and holds on to the handle -- and
+  #    only one handle can be held at a time. "App" here means the holder of
+  #    that handle.
+
   services.pipewire = {
+    # Run PipeWire as THE sound server.
     enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true; # most games speak the PulseAudio protocol
+
+    alsa = {
+      # Catch apps that use the ALSA userspace API directly and redirect them
+      # into PipeWire, instead of letting them grab the hardware exclusively.
+      enable = true;
+
+      # The same redirect shim in 32-bit, for the many Proton/Windows games and
+      # older native titles that are 32-bit binaries -- the audio twin of the
+      # 32-bit graphics libraries Steam pulls in.
+      support32Bit = true;
+    };
+
+    # Speak the PulseAudio protocol on the PulseAudio socket. Most software
+    # (Steam, SDL, most game engines) targets PulseAudio and works unchanged,
+    # never noticing PipeWire answered. No actual PulseAudio runs here.
+    pulse.enable = true;
   };
-  security.rtkit.enable = true; # lets PipeWire acquire realtime scheduling
+
+  # RealtimeKit: a D-Bus broker that grants realtime CPU priority to
+  # unprivileged processes, within safety limits. PipeWire's mixer thread must
+  # produce the next few milliseconds of samples on time, every time -- late
+  # scheduling is audible as crackles. On a box that keeps its CPU pinned by
+  # games, this is what keeps audio glitch-free.
+  security.rtkit.enable = true;
 
   #### Steam + gamescope #######################################################
 
