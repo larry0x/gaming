@@ -21,8 +21,8 @@
 #    plain `--flake .` also works: it selects the config whose name matches
 #    the hostname.)
 #
-# TODO(larry): grep for "TODO" -- hostname and user password are placeholders
-# pending details.
+# TODO(larry): grep for "TODO" -- the hostname is a placeholder pending a
+# decision.
 
 { lib, pkgs, ... }:
 
@@ -71,6 +71,48 @@
   # Set once at install time and never changed afterwards, even when upgrading
   # the system later.
   system.stateVersion = "26.05";
+
+  #### Users ###################################################################
+
+  # Besides the accounts declared here, NixOS creates a few dozen system
+  # accounts for daemons (sshd, rtkit, nixbld1..32 for sandboxed Nix builds,
+  # ...), all with logins disabled.
+
+  # Lock root: "!" is the shadow-file convention for "no password matches".
+  # Root would be created locked anyway when no password is specified; this
+  # makes the invariant explicit -- and enforced even if users.mutableUsers
+  # is ever set to false. Root work happens via `sudo -i`. At install time,
+  # pass `--no-root-passwd` to nixos-install so it does not prompt to set a
+  # root password imperatively (which would override this until re-locked).
+  users.users.root.hashedPassword = "!";
+
+  users.users.larry = {
+    # A "normal" user is a human login account: a home directory under /home,
+    # a uid from 1000 up, membership of the "users" group, a login shell. The
+    # abnormal kind (isSystemUser) is those daemon accounts: system-range
+    # uid, no home, nologin shell. Exactly one of the two must be true.
+    isNormalUser = true;
+
+    extraGroups = [ "wheel" ]; # sudo
+
+    # TTY login password, meant to live only until the first boot: change it
+    # right away with `passwd`. The change sticks -- users.mutableUsers
+    # defaults to true, making passwords machine state like the WiFi and
+    # Tailscale credentials. A plaintext "123" here is acceptable because SSH
+    # password login is disabled: this password works only at the physical
+    # TTY (and for sudo).
+    initialPassword = "123";
+
+    # SSH public keys allowed to log in as this user. Managed declaratively:
+    # written to /etc/ssh/authorized_keys.d/larry, not ~/.ssh/authorized_keys.
+    openssh.authorizedKeys.keys = [
+      # larry_yubikey_082.pub
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF0WGLelGJfREUvxlyGW26jJvOte2sodtcYkXnhmo0RY openpgp:0xE1D94862"
+
+      # larry_yubikey_093.pub
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPp84hGfIow1NeLZCJOo2voxJWyCgoJA9QA3cWufF7bA openpgp:0x0854DE69"
+    ];
+  };
 
   #### Boot ####################################################################
 
@@ -295,27 +337,4 @@
     };
   };
 
-  #### Users ###################################################################
-
-  users.users.larry = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ]; # sudo
-
-    # TTY login password. CHANGE THIS after first boot with `passwd`, or
-    # replace with hashedPassword (generate one via `mkpasswd -m sha-512`).
-    initialPassword = "changeme";
-
-    # SSH public keys allowed to log in as this user. Managed declaratively:
-    # written to /etc/ssh/authorized_keys.d/larry, not ~/.ssh/authorized_keys.
-    openssh.authorizedKeys.keys = [
-      # larry_yubikey_082.pub
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF0WGLelGJfREUvxlyGW26jJvOte2sodtcYkXnhmo0RY openpgp:0xE1D94862"
-
-      # larry_yubikey_093.pub
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPp84hGfIow1NeLZCJOo2voxJWyCgoJA9QA3cWufF7bA openpgp:0x0854DE69"
-    ];
-  };
-
-  # To skip the password prompt entirely someday:
-  # services.getty.autologinUser = "larry";
 }
