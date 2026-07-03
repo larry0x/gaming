@@ -32,10 +32,25 @@
 
   time.timeZone = "UTC";
 
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
+  nix = {
+    settings.experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
+
+    # Garbage collection: nothing sweeps /nix/store by default, and on this box
+    # every generation pins a kernel, the NVIDIA driver, and Steam's closure --
+    # gigabytes per rebuild, accumulating unbounded. This timer runs
+    # `nix-collect-garbage --delete-older-than 30d` weekly: generations older
+    # than 30 days lose their profile entry, then store paths no longer
+    # reachable from any remaining generation (or other GC root) are deleted.
+    # The current generation is never deleted.
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 30d";
+    };
+  };
 
   # Makes these packages' commands available in every user's shell.
   environment.systemPackages = with pkgs; [
@@ -127,8 +142,8 @@
         # created per nixos-rebuild. Each entry copies its kernel + initrd onto
         # the EFI System Partition, a small FAT filesystem that fills up --
         # failing future rebuilds -- if entries accumulate unbounded. Older
-        # generations still exist in /nix/store until garbage-collected; they
-        # only lose their menu entry.
+        # generations still exist in /nix/store until garbage-collected (the
+        # nix.gc timer in the System section); they only lose their menu entry.
         configurationLimit = 10;
       };
 
@@ -139,15 +154,6 @@
       # untouched.
       efi.canTouchEfiVariables = true;
     };
-
-    # The default is pkgs.linuxPackages, the release's LTS kernel (6.18.x on
-    # 26.05); _latest is mainline (7.1.x), preferred because support for new
-    # GPUs, controllers, and HDR lands there first -- exactly what a gaming
-    # box wants.
-    # Not a reproducibility hole: "latest" resolves inside the nixpkgs revision
-    # pinned by flake.lock, so rebuilds always yield the same kernel. It only
-    # changes which version a future `nix flake update` may jump to.
-    kernelPackages = pkgs.linuxPackages_latest;
   };
 
   #### Hardware ################################################################
