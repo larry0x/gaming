@@ -20,9 +20,6 @@
 # 3. `sudo nixos-rebuild switch --flake .#gaming`. (Once the hostname is set,
 #    plain `--flake .` also works: it selects the config whose name matches
 #    the hostname.)
-#
-# TODO(larry): grep for "TODO" -- the hostname is a placeholder pending a
-# decision.
 
 { lib, pkgs, ... }:
 
@@ -193,7 +190,7 @@
   #### Networking ##############################################################
 
   networking = {
-    hostName = "gaming"; # TODO
+    hostName = "gaming";
 
     # WiFi. iwd (iNet wireless daemon) is the minimalist supplicant; no
     # network manager needed. Connect once at the TTY:
