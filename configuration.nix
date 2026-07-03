@@ -90,16 +90,39 @@
   #### Boot ####################################################################
 
   boot = {
-    # Assumes UEFI. For legacy BIOS, use boot.loader.grub instead.
     loader = {
       systemd-boot = {
+        # Replaces GRUB, the default, as the more minimalist choice: a plain
+        # UEFI boot menu -- no drivers, no scripting -- that also needs fewer
+        # options to set. (Assumes UEFI; on legacy BIOS, GRUB is the only
+        # choice.)
         enable = true;
+
+        # Only keep boot menu entries for the 10 newest generations.
+        # A "generation" is a complete bootable snapshot of the entire OS,
+        # created per nixos-rebuild. Each entry copies its kernel + initrd onto
+        # the EFI System Partition, a small FAT filesystem that fills up --
+        # failing future rebuilds -- if entries accumulate unbounded. Older
+        # generations still exist in /nix/store until garbage-collected; they
+        # only lose their menu entry.
         configurationLimit = 10;
       };
+
+      # Let the bootloader installer write EFI variables in the firmware's
+      # NVRAM (what `efibootmgr` does on other distros), registering
+      # systemd-boot in the firmware's boot order. Without this, the loader is
+      # only placed at the ESP's fallback path and firmware settings are left
+      # untouched.
       efi.canTouchEfiVariables = true;
     };
 
-    # Latest kernel for best support of recent GPUs and controllers.
+    # The default is pkgs.linuxPackages, the release's LTS kernel (6.18.x on
+    # 26.05); _latest is mainline (7.1.x), preferred because support for new
+    # GPUs, controllers, and HDR lands there first -- exactly what a gaming
+    # box wants.
+    # Not a reproducibility hole: "latest" resolves inside the nixpkgs revision
+    # pinned by flake.lock, so rebuilds always yield the same kernel. It only
+    # changes which version a future `nix flake update` may jump to.
     kernelPackages = pkgs.linuxPackages_latest;
   };
 
@@ -108,12 +131,7 @@
   # Firmware blobs; GPUs, WiFi and Bluetooth chips all need these.
   hardware.enableRedistributableFirmware = true;
 
-  # Userspace graphics (Mesa) incl. 32-bit, which the Steam client and many
-  # games require. programs.steam.enable would set these anyway; kept explicit.
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-  };
+  # Userspace graphics (Mesa, incl. 32-bit) is enabled by programs.steam.
 
   # GPU driver -- TODO: fill in once the card is known.
   #
@@ -180,13 +198,10 @@
     # extraCompatPackages = [ pkgs.proton-ge-bin ];
   };
 
-  programs.gamescope = {
-    enable = true;
-    # Realtime priority for the compositor thread; smooths out frame times.
-    # Enable once the basic setup is confirmed working -- if steam-gamescope
-    # ever fails to start, this is the first thing to turn back off.
-    # capSysNice = true;
-  };
+  # gamescope itself is enabled by gamescopeSession above. If frame times need
+  # smoothing, grant the compositor realtime priority -- but should
+  # steam-gamescope ever fail to start, turn this back off first:
+  # programs.gamescope.capSysNice = true;
 
   # CPU governor / niceness tweaks while a game is running:
   # programs.gamemode.enable = true;
