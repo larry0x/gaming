@@ -21,8 +21,8 @@
 #    plain `--flake .` also works: it selects the config whose name matches
 #    the hostname.)
 #
-# TODO(larry): grep for "TODO" -- hostname, user password, WiFi, and Tailscale
-# are placeholders pending details.
+# TODO(larry): grep for "TODO" -- hostname and user password are placeholders
+# pending details.
 
 { lib, pkgs, ... }:
 
@@ -45,25 +45,6 @@
     git
     vim
   ];
-
-  # Remote administration from another machine, so this box never needs more
-  # than a TTY. This one option brings the sshd binary, its systemd unit, and
-  # a firewall exception for port 22; nothing to add to systemPackages. (The
-  # port-22 exception currently applies on all interfaces -- to be restricted
-  # to the tailnet; see the Tailscale TODO under Networking.)
-  services.openssh = {
-    enable = true;
-    settings = {
-      # Key-only login; the keys live in users.users.larry below.
-      PasswordAuthentication = false;
-
-      # "Keyboard-interactive" is a challenge-response scheme where the server
-      # drives arbitrary prompts -- in practice, PAM conversations such as
-      # passwords or OTP codes. It is a second password-style path into the
-      # box, so key-only login means closing it as well.
-      KbdInteractiveAuthentication = false;
-    };
-  };
 
   # "Unfree" is nixpkgs jargon for a package whose license is not a free/open
   # source one. Nixpkgs refuses to install unfree packages unless opted in.
@@ -169,24 +150,69 @@
 
   #### Networking ##############################################################
 
-  networking.hostName = "gaming"; # TODO
+  networking = {
+    hostName = "gaming"; # TODO
 
-  # Wired ethernet with DHCP works out of the box; nothing to configure.
-  # WiFi -- TODO: iwd is the minimalist choice, configured interactively
-  # with `iwctl`:
-  # networking.wireless.iwd.enable = true;
+    # WiFi. iwd (iNet wireless daemon) is the minimalist supplicant; no
+    # network manager needed. Connect once at the TTY:
+    #
+    # ```sh
+    # iwctl station wlan0 connect <SSID>
+    # ```
+    #
+    # and iwd saves the network to /var/lib/iwd, reconnecting automatically on
+    # every boot after that.
+    #
+    # IP addressing, wired and wireless alike, is handled by dhcpcd, the NixOS default.
+    wireless.iwd.enable = true;
 
-  # The NixOS firewall is enabled by default: everything inbound is dropped
-  # unless a port is opened here or by a module (as services.openssh does).
+    # The NixOS firewall is enabled by default: everything inbound is dropped
+    # unless a port is opened here or by a module. The single exception: SSH,
+    # reachable only from within the tailnet.
+    firewall.interfaces."tailscale0".allowedTCPPorts = [ 22 ];
+  };
+
+  # Remote administration from another machine, so this box never needs more
+  # than a TTY. Enabling brings the sshd binary and its systemd unit; nothing
+  # to add to systemPackages.
+  services.openssh = {
+    enable = true;
+
+    # Enabling sshd normally also punches a hole in the firewall -- port 22
+    # open on ALL interfaces (this option defaults to true). Opt out of that,
+    # leaving the tailscale0 rule under networking.firewall above as the only
+    # way in.
+    openFirewall = false;
+
+    settings = {
+      # Key-only login; the keys live in users.users.larry below.
+      PasswordAuthentication = false;
+
+      # "Keyboard-interactive" is a challenge-response scheme where the server
+      # drives arbitrary prompts -- in practice, PAM conversations such as
+      # passwords or OTP codes. It is a second password-style path into the
+      # box, so key-only login means closing it as well.
+      KbdInteractiveAuthentication = false;
+    };
+  };
+
+  # Mesh VPN; SSH is only reachable through it. Enabling this installs and
+  # starts the daemon (tailscaled) in a logged-out state -- joining a tailnet
+  # is a one-time imperative step, never part of nixos-rebuild. After first
+  # boot:
   #
-  # TODO: Tailscale, then restrict SSH to the tailnet. The plan:
-  #   services.tailscale.enable = true;
-  #   services.openssh.openFirewall = false; # stop opening port 22 globally...
-  #   networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 22 ]; # ...allow it from the tailnet only
-
-  # Steam networking extras, if ever wanted:
-  # programs.steam.remotePlay.openFirewall = true;
-  # programs.steam.localNetworkGameTransfers.openFirewall = true;
+  # ```sh
+  # sudo tailscale up
+  # ```
+  #
+  # then open the login URL it prints in a browser on another device (e.g.
+  # the Mac) and complete the sign-in there. Any identity provider works,
+  # including Sign in with Apple -- this machine never sees the credentials,
+  # it only receives the resulting authorization.
+  #
+  # The node state lives in /var/lib/tailscale, surviving reboots and
+  # rebuilds.
+  services.tailscale.enable = true;
 
   #### Audio ###################################################################
 
