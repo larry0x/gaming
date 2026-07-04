@@ -325,15 +325,19 @@
     # titles in Steam: Settings > Compatibility, after first login.
     enable = true;
 
-    # Big Picture's "Power > Switch to Desktop" execs the SteamOS helper
-    # `steamos-session-select`, then waits for the surrounding session to tear
-    # Steam down and start a desktop. Neither exists on this box, so the stock
-    # button hangs forever on "Switching to Desktop". Provide the helper and
-    # make it mean "quit Steam gracefully": `steam -shutdown` (one of the few
-    # client flags Valve documents) saves state and exits the client, which
-    # ends the gamescope session and drops back to the TTY. The script must be
-    # visible INSIDE Steam's FHS sandbox -- the client is what invokes it --
-    # hence extraPackages, not environment.systemPackages.
+    # Big Picture's "Power > Switch to Desktop" only does anything in SteamOS
+    # mode (the -steamos3 flag below; without it the client still draws the
+    # menu entry -- that part is gated merely on "running inside gamescope" --
+    # but the click execs nothing and the "Switching to Desktop" spinner hangs
+    # forever; steam-for-linux #11241). In SteamOS mode it execs the SteamOS
+    # helper `steamos-session-select`, then waits for the surrounding session
+    # to tear Steam down and start a desktop. No desktop exists on this box,
+    # so provide the helper and make it mean "quit Steam gracefully":
+    # `steam -shutdown` (one of the few client flags Valve documents) saves
+    # state and exits the client, which ends the gamescope session and drops
+    # back to the TTY. The script must be visible INSIDE Steam's FHS sandbox
+    # -- the client is what invokes it -- hence extraPackages, not
+    # environment.systemPackages.
     extraPackages = [
       (pkgs.writeShellScriptBin "steamos-session-select" ''
         exec steam -shutdown
@@ -360,23 +364,36 @@
       ];
 
       # Arguments to Steam itself. Setting this option REPLACES its default,
-      # so the two stock entries are restated: -tenfoot starts the client
-      # straight into Big Picture; -pipewire-dmabuf enables zero-copy PipeWire
-      # capture of the session (Remote Play, game recording).
-      #
-      # -cef-force-gpu forces GPU-accelerated rendering of the client's web
-      # views (steamwebhelper, an embedded Chromium), overriding the "Enable
-      # GPU accelerated rendering in web views" toggle persisted in
-      # ~/.local/share/Steam/config/config.vdf. Without acceleration, Big
-      # Picture rasterizes 4K frames on the CPU -- a ~1 fps slideshow. The
-      # flag is undocumented (Valve documents almost no client flags), but
-      # verified on this box 2026-07-04: with the toggle off, launching with
-      # the flag still yields a smooth UI. If a future client drops the flag,
-      # it is silently ignored and the persisted toggle rules again.
+      # so the two stock entries (-tenfoot, -pipewire-dmabuf) must be restated.
       steamArgs = [
+        # Starts the client straight into Big Picture.
         "-tenfoot"
+
+        # Enables zero-copy PipeWire capture of the session (Remote Play, game
+        # recording).
         "-pipewire-dmabuf"
+
+        # Forces GPU-accelerated rendering of the client's web views
+        # (steamwebhelper, an embedded Chromium), overriding the "Enable GPU
+        # accelerated rendering in web views" toggle persisted in
+        # ~/.local/share/Steam/config/config.vdf. Without acceleration, Big
+        # Picture rasterizes 4K frames on the CPU -- a ~1 fps slideshow. The
+        # flag is undocumented (Valve documents almost no client flags), but
+        # verified on this box 2026-07-04: with the toggle off, launching with
+        # the flag still yields a smooth UI. If a future client drops the flag,
+        # it is silently ignored and the persisted toggle rules again.
         "-cef-force-gpu"
+
+        # Declares the client to be running on SteamOS 3 (the Steam Deck's
+        # OS). This is what arms the power menu's "Switch to Desktop" action:
+        # the client only invokes `steamos-session-select` (the shim in
+        # extraPackages above) in SteamOS mode; without the flag the click
+        # execs nothing and the spinner hangs forever (steam-for-linux
+        # #11241). Same recipe as ChimeraOS/Bazzite-style gamescope sessions.
+        # Known tradeoff: SteamOS mode disables the Shift-Tab keyboard
+        # shortcut for the in-game overlay; irrelevant here, the controller's
+        # Guide button still opens it.
+        "-steamos3"
       ];
     };
   };
