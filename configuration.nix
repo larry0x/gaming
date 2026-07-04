@@ -325,6 +325,21 @@
     # titles in Steam: Settings > Compatibility, after first login.
     enable = true;
 
+    # Big Picture's "Power > Switch to Desktop" execs the SteamOS helper
+    # `steamos-session-select`, then waits for the surrounding session to tear
+    # Steam down and start a desktop. Neither exists on this box, so the stock
+    # button hangs forever on "Switching to Desktop". Provide the helper and
+    # make it mean "quit Steam gracefully": `steam -shutdown` (one of the few
+    # client flags Valve documents) saves state and exits the client, which
+    # ends the gamescope session and drops back to the TTY. The script must be
+    # visible INSIDE Steam's FHS sandbox -- the client is what invokes it --
+    # hence extraPackages, not environment.systemPackages.
+    extraPackages = [
+      (pkgs.writeShellScriptBin "steamos-session-select" ''
+        exec steam -shutdown
+      '')
+    ];
+
     # Provides the `steam-gamescope` command: gamescope running directly on
     # DRM/KMS with Steam Big Picture inside it.
     gamescopeSession = {
@@ -342,6 +357,26 @@
         "144"
         "--adaptive-sync"
         "--hdr-enabled"
+      ];
+
+      # Arguments to Steam itself. Setting this option REPLACES its default,
+      # so the two stock entries are restated: -tenfoot starts the client
+      # straight into Big Picture; -pipewire-dmabuf enables zero-copy PipeWire
+      # capture of the session (Remote Play, game recording).
+      #
+      # -cef-force-gpu forces GPU-accelerated rendering of the client's web
+      # views (steamwebhelper, an embedded Chromium), overriding the "Enable
+      # GPU accelerated rendering in web views" toggle persisted in
+      # ~/.local/share/Steam/config/config.vdf. Without acceleration, Big
+      # Picture rasterizes 4K frames on the CPU -- a ~1 fps slideshow. The
+      # flag is undocumented (Valve documents almost no client flags), but
+      # verified on this box 2026-07-04: with the toggle off, launching with
+      # the flag still yields a smooth UI. If a future client drops the flag,
+      # it is silently ignored and the persisted toggle rules again.
+      steamArgs = [
+        "-tenfoot"
+        "-pipewire-dmabuf"
+        "-cef-force-gpu"
       ];
     };
   };
