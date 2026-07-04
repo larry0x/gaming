@@ -63,6 +63,7 @@
     fastfetch
     git
     just
+    mangohud
     vim
   ];
 
@@ -352,10 +353,10 @@
     gamescopeSession = {
       enable = true;
 
-      # The TV is a Hisense 100U7KQ: 3840x2160, and accepts 4K@144 Hz with
-      # VRR (FreeSync Premium Pro, 48-144 Hz range) over HDMI 2.1. Game mode
-      # must be enabled on the TV's input for VRR/144 to be offered.
       args = [
+        # The TV is a Hisense 100U7KQ: 3840x2160, and accepts 4K@144 Hz with
+        # VRR (FreeSync Premium Pro, 48-144 Hz range) over HDMI 2.1. Game mode
+        # must be enabled on the TV's input for VRR/144 to be offered.
         "-W"
         "3840"
         "-H"
@@ -364,7 +365,29 @@
         "144"
         "--adaptive-sync"
         "--hdr-enabled"
+
+        # Spawn mangoapp (from the mangohud package in systemPackages) inside
+        # the session: the performance overlay SteamOS uses. gamescope
+        # composites it on top of whatever is on screen, so it covers every
+        # game -- any graphics API, native or Proton, 32- or 64-bit -- and
+        # the Big Picture UI itself, with no per-game launch options.
+        "--mangoapp"
       ];
+
+      # Capability flags that SteamOS's own session exports; the
+      # steam-gamescope wrapper `export`s these before exec'ing gamescope, so
+      # gamescope, mangoapp and the client all inherit them. They advertise
+      # the mangoapp overlay to the client, which then shows a "Performance
+      # Overlay Level" slider in Quick Access (the "..." button >
+      # Performance): level 0 (off) up to 4, from a bare FPS number to the
+      # full panel -- CPU/GPU load and temperature, RAM/VRAM, frametime
+      # graph. Same recipe as ChimeraOS/Bazzite, which pair these with
+      # SteamOS mode (-steamos3 below).
+      env = {
+        STEAM_USE_MANGOAPP = "1";
+        STEAM_MANGOAPP_PRESETS_SUPPORTED = "1";
+        STEAM_MANGOAPP_HORIZONTAL_SUPPORTED = "1";
+      };
 
       # Arguments to Steam itself. Setting this option REPLACES its default,
       # so the two stock entries (-tenfoot, -pipewire-dmabuf) must be restated.
