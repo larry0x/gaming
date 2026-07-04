@@ -7,8 +7,10 @@
 # - Steam cannot draw on a bare TTY -- it needs *a* display server. The
 #   lightest one that works is gamescope, Valve's micro-compositor (the same
 #   thing SteamOS runs), which drives the GPU directly via DRM/KMS.
-# - Flow: boot -> log in on the TTY -> run `steam-gamescope` -> Steam Big
-#   Picture. Quitting Steam drops you back to the TTY.
+# - Flow: boot -> getty auto-logs larry in on tty1 -> the login shell launches
+#   `steam-gamescope` -> Steam Big Picture, with no input anywhere. Quitting
+#   Steam ("Switch to Desktop" in Big Picture) drops to a logged-in shell on
+#   tty1; logging out of it (Ctrl-D) brings Big Picture back.
 #
 # Install workflow:
 #
@@ -113,12 +115,13 @@
 
     extraGroups = [ "wheel" ]; # sudo
 
-    # TTY login password, meant to live only until the first boot: change it
-    # right away with `passwd`. The change sticks -- users.mutableUsers
-    # defaults to true, making passwords machine state like the WiFi and
-    # Tailscale credentials. A plaintext "123" here is acceptable because SSH
-    # password login is disabled: this password works only at the physical
-    # TTY (and for sudo).
+    # Meant to live only until the first boot: change it right away with
+    # `passwd`. The change sticks -- users.mutableUsers defaults to true,
+    # making passwords machine state like the WiFi and Tailscale credentials.
+    # Auto-login (see the last section) means no console prompt ever asks for
+    # this password; its remaining job is gating sudo. A plaintext "123" here
+    # is acceptable because SSH password login is disabled: no remote path
+    # accepts any password.
     initialPassword = "123";
 
     # SSH public keys allowed to log in as this user. Managed declaratively:
@@ -397,4 +400,39 @@
       ];
     };
   };
+
+  #### Auto-login + auto-launch ###############################################
+
+  # Log larry in automatically on the virtual consoles: getty runs
+  # `agetty --autologin larry`, which skips the password prompt but still runs
+  # the full PAM session machinery (logind session on seat0, XDG_RUNTIME_DIR),
+  # so the resulting shell is identical to one from a typed login. Local TTYs
+  # only: SSH never passes through getty -- sshd authenticates by its own
+  # rules (public keys, see Networking) and is unaffected. The account
+  # password stays, solely as the sudo gate.
+  services.getty.autologinUser = "larry";
+
+  # Launch Steam from the auto-logged-in shell. loginShellInit is appended to
+  # /etc/profile, which every login shell sources; three guards scope it to
+  # exactly the boot-time console session:
+  #
+  # - tty1 only: SSH sessions run on pseudo-terminals (/dev/pts/N), and the
+  #   other consoles (Ctrl-Alt-F2, ...) stay plain shells for maintenance.
+  # - larry only: `sudo -i` on tty1 is also a login shell on tty1; without
+  #   this guard it would launch a second Steam, as root.
+  # - once per login: a nested `bash -l` inherits the marker variable and
+  #   stays a plain shell.
+  #
+  # Deliberately NOT `exec`: the shell survives Steam exiting, so "Switch to
+  # Desktop" (the shim above) lands on a logged-in tty1 prompt. Logging out of
+  # that shell (Ctrl-D) makes getty respawn and auto-login again, relaunching
+  # Steam: quit = shell, Ctrl-D = back to Big Picture. With `exec`, the
+  # respawn would relaunch Steam instantly, turning "Switch to Desktop" into
+  # "restart Steam".
+  environment.loginShellInit = ''
+    if [ "$(tty)" = /dev/tty1 ] && [ "$USER" = larry ] && [ -z "$STEAM_AUTOLAUNCHED" ]; then
+      export STEAM_AUTOLAUNCHED=1
+      steam-gamescope
+    fi
+  '';
 }
