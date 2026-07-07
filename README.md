@@ -192,7 +192,7 @@ just test
     sudo tailscale up
     ```
 
-    On the Mac, the computer becomes accesible with:
+    On the Mac, the computer becomes accessible with:
 
     ```sh
     ssh larry@gaming
