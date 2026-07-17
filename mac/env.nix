@@ -34,10 +34,18 @@ let
 
     src = pkgs.fetchCrate {
       inherit pname version;
+
+      # Integrity hash of the source tarball; the fetch fails if crates.io
+      # ever serves different bytes for this name and version.
       hash = "sha256-F6ozNlN8umagAWr+xeA61uf+QOae/y6VnyzWKDsFIhk=";
     };
 
+    # Same, for the vendored dependency tree (everything in the crate's
+    # Cargo.lock), which is fetched in a separate step so the build itself
+    # can run offline.
     cargoHash = "sha256-LUHVGEvE22ITlmpuI+8qGBPTa7q8YssiLSfQnvGM4hw=";
+
+    # Skip the crate's own test suite; the released binary is all we need.
     doCheck = false;
   };
 in
