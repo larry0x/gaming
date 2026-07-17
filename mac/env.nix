@@ -81,7 +81,12 @@ pkgs.buildEnv {
     pkgs.docker-compose
     pkgs.docker-buildx
 
-    # Secrets / YubiKey
+    # Secrets / YubiKey. gpg-agent doubles as the SSH agent, with the private
+    # keys living on the YubiKey; pinentry-mac provides the GUI PIN prompt
+    # (its path is wired into ~/.gnupg/gpg-agent.conf, and git's gpg.program
+    # points at the gpg here).
+    pkgs.gnupg
+    pkgs.pinentry_mac
     pkgs.sops
     pkgs.age
     pkgs.age-plugin-yubikey
