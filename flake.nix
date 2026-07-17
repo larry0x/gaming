@@ -9,7 +9,7 @@
     { nixpkgs, ... }:
     {
       nixosConfigurations.gaming = nixpkgs.lib.nixosSystem {
-        modules = [ ./configuration.nix ];
+        modules = [ ./pc/configuration.nix ];
       };
     };
 }

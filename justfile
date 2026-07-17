@@ -17,7 +17,7 @@ test:
 
 # Install NixOS for the first time
 install:
-  sudo nixos-generate-config --root /mnt --show-hardware-config > hardware-configuration.nix
+  sudo nixos-generate-config --root /mnt --show-hardware-config > pc/hardware-configuration.nix
   sudo nixos-install --flake .#gaming --no-root-passwd
 
 # Rebuild NixOS
