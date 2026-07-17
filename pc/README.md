@@ -153,8 +153,6 @@ Minimalist NixOS gaming machine
 ## Update
 
 ```sh
-nix flake update nixpkgs
-just rebuild
+just update
+just pc-rebuild
 ```
-
-Updating only the `nixpkgs` input keeps the mac environment's inputs untouched.
