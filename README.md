@@ -16,15 +16,17 @@ curl -fsSL https://install.determinate.systems/nix | sh -s -- install
 
 Open a new terminal afterwards so the shell picks up the Nix environment.
 
-### 2. Install the language server, linters, and formatter
+### 2. Install the development environment
+
+Clone this repo and install the [`mac/`](./mac/) environment into the user profile:
 
 ```sh
-nix profile add \
-  nixpkgs/nixos-26.05#nixd \
-  nixpkgs/nixos-26.05#nixfmt \
-  nixpkgs/nixos-26.05#statix \
-  nixpkgs/nixos-26.05#deadnix
+git clone https://github.com/larry0x/nix.git ~/workspace/larry0x/nix
+cd ~/workspace/larry0x/nix
+nix profile add .
 ```
+
+Among everything else, this provides the Nix tooling used to work on this repo:
 
 - `nixd`: language server — completion, hover docs, and diagnostics for NixOS options
 - `nixfmt`: the official formatter
