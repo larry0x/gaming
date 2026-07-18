@@ -7,7 +7,7 @@ Layering rules:
 - Everything development-related lives here, in Nix.
 - Homebrew is for non-development software only, e.g. GUI apps (casks).
 - Stock macOS tools stay stock — notably git, which ships with the Xcode Command Line Tools.
-- Claude Code uses its own self-updating native installer.
+- Coding agents — Claude Code and OpenCode — are deliberately installed with their official installer scripts, not from nixpkgs. Rationale: they release near-daily, and only native installs self-update; a nixpkgs install stays frozen at whatever `flake.lock` pinned, and OpenCode's nixpkgs wrapper disables its auto-updater outright (`OPENCODE_DISABLE_AUTOUPDATE`). Their binaries live in `~/.local/bin` and `~/.opencode/bin`, put on `PATH` by `~/.zshrc`.
 - No language-version managers (rustup, nvm, corepack): toolchains are pinned by `flake.lock`.
 
 ## Install
@@ -29,7 +29,6 @@ Roll back with `nix profile rollback`.
 
 ## Notes
 
-- `cargo` is a thin shim that accepts rustup-style `cargo +nightly …` invocations: the `+toolchain` argument is dropped, which is correct because rustfmt in this environment _is_ the nightly one, and everything else runs on the stable toolchain.
 - mdbook and mdbook-mermaid come stock from nixpkgs; mdbook-katex is built from crates.io (nixpkgs' version is stale). The preprocessors may print a cosmetic "built against version X" warning when their locked mdbook libraries trail the mdbook binary — math and diagrams render fine regardless.
 - The docker daemon is colima (`colima start`); the docker CLI, compose, and buildx come from this flake, with the compose/buildx plugins linked into `~/.docker/cli-plugins/`.
 - No GNU coreutils: the stock BSD userland (`ls`, `date`, `stat`, etc.) stays as-is, with Rust replacements (bat, eza, dust, ripgrep) aliased over the common ones in interactive shells via `~/.zshrc`.
