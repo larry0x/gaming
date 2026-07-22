@@ -185,6 +185,15 @@
       # Skip nvidia-settings, an X-based GUI tool (enabled by default),
       # useless on a box with no desktop.
       nvidiaSettings = false;
+
+      # Preserve video memory across suspend: the nvidia-suspend/nvidia-resume
+      # systemd services save in-use VRAM to /tmp (on disk here) before S3 and
+      # restore it after. Without this the GPU comes back with VRAM empty --
+      # gamescope's buffers are gone, its page-flip never completes ("Flip
+      # event timeout" from nvidia-drm), and the screen stays dead even though
+      # the system resumed fine underneath (SSH still works). Costs a few
+      # seconds per suspend/resume for the VRAM round-trip.
+      powerManagement.enable = true;
     };
 
     # Bluetooth, for the Xbox controller; the radio powers on at boot by
@@ -202,6 +211,22 @@
   # Despite the option's name, this loads the NVIDIA kernel driver for the
   # whole system, not just for X.
   services.xserver.videoDrivers = [ "nvidia" ];
+
+  # Bluetooth wake-from-suspend. The kernel side needs no config: on suspend
+  # it arms the adapter with an allow-list of paired HID devices (BlueZ
+  # "WakeAllowed", on by default for keyboards/controllers), whose reconnect
+  # attempt -- a keypress while the box sleeps -- becomes a USB remote-wakeup
+  # signal. What IS off by default is the USB side: every hop the signal
+  # traverses must have power/wakeup enabled. These rules arm all three hops:
+  # the BT adapter itself (Intel AC 3168 combo, 8087:0aa7), its root hub, and
+  # the chipset xHCI PCI function both hang off (0000:02:00.0). The root hub
+  # is matched by serial, which carries the stable PCI address, because bus
+  # names (usb1, ...) depend on enumeration order.
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0aa7", ATTR{power/wakeup}="enabled"
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{serial}=="0000:02:00.0", ATTR{power/wakeup}="enabled"
+    ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:02:00.0", ATTR{power/wakeup}="enabled"
+  '';
 
   #### Networking ##############################################################
 
