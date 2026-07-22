@@ -4,8 +4,6 @@
 
 { pkgs, fenixPkgs }:
 let
-  # ----------------------------------- Rust -----------------------------------
-
   # The stable toolchain, pinned by flake.lock. There is deliberately no
   # nightly anything here — my projects format with stable rustfmt.
   rustToolchain = fenixPkgs.stable.withComponents [
@@ -15,8 +13,6 @@ let
     "rustc"
     "rustfmt"
   ];
-
-  # ----------------------------------- Docs -----------------------------------
 
   # mdbook and mdbook-mermaid come stock from nixpkgs. mdbook-katex must be
   # built from source, because nixpkgs ships a stale version that predates
@@ -55,14 +51,19 @@ pkgs.buildEnv {
     # Rust
     rustToolchain
     pkgs.rust-analyzer
-    pkgs.just
-    pkgs.taplo
     pkgs.cargo-machete
 
-    # Docs
+    # mdBook
     pkgs.mdbook
     pkgs.mdbook-mermaid
     mdbook-katex
+
+    # Just
+    pkgs.just
+    pkgs.just-lsp
+
+    # TOML
+    pkgs.taplo
 
     # JavaScript / TypeScript
     pkgs.nodejs_24
