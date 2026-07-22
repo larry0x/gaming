@@ -18,7 +18,7 @@ Minimalist NixOS gaming machine
 | Display     | Hisense 100U7KQ                     | 2025-07-08    | worten.pt       |     2,599.00 € |
 | Audio       | TBD                                 | TBD           | TBD             |            TBD |
 | Keyboard    | Lofree Flow Lite 84[^1]             | 2026-06-22    | lofree.co       |        66.60 € |
-| Controller  | EasySMX[^1][^2]                     | 2025-09-12    | amazon.es       |        46.78 € |
+| Controller  | EasySMX X20[^1][^2]                 | 2025-09-12    | amazon.es       |        46.78 € |
 | **Total**   |                                     |               |                 | **5,784.07 €** |
 
 [^1]: Connected to PC using the 2.4 GHz USB receiver. This PC has Bluetooth disabled.
