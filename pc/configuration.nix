@@ -230,16 +230,26 @@
     ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:02:00.0", ATTR{power/wakeup}="enabled"
   '';
 
-  # Wake the TV whenever the PC resumes, so it comes on with the machine. A
-  # consumer GPU has no HDMI-CEC, so the TV cannot be woken over the HDMI cable
-  # the way a console does it; instead this publishes KEY_POWER to the TV's
-  # local MQTT broker (which stays alive in its standby) over mutual TLS. The
-  # script is standard-library-only, so a bare python3 runs it -- nothing is
-  # added to systemPackages. It reads its client certificate from
-  # /var/lib/vidaa (imperative host state) and retries the connection to ride
-  # out WiFi reassociation after resume; it is state-aware, so it never toggles
-  # off a TV that is already on. Full story and one-time setup: pc/WAKING.md.
-  powerManagement.resumeCommands = "${pkgs.python3}/bin/python3 ${./wake-tv.py}";
+  # Keep the TV's power in lockstep with the PC's: wake it on resume, put it
+  # into standby on suspend. A consumer GPU has no HDMI-CEC, so the TV cannot
+  # be driven over the HDMI cable the way a console does it; instead the
+  # script publishes KEY_POWER to the TV's local MQTT broker (which stays
+  # alive in its standby) over mutual TLS. It is standard-library-only, so a
+  # bare python3 runs it -- nothing is added to systemPackages -- and it reads
+  # its client certificate from /var/lib/vidaa (imperative host state).
+  # KEY_POWER is a toggle, so the script is state-aware: it asks the TV for
+  # its state first and never fires when the TV is already where it should
+  # be. The directions budget differently: "on" retries for ~20 s to ride out
+  # WiFi reassociation after resume, while "off" fails fast, since the suspend
+  # waits on it with no timeout of its own. Powering the PC off is
+  # deliberately not covered -- NixOS incidentally runs powerDownCommands at
+  # shutdown too, but unordered against the WiFi teardown, so a TV that goes
+  # dark with a poweroff is a bonus, never a promise. Full story and one-time
+  # setup: pc/WAKING.md.
+  powerManagement = {
+    resumeCommands = "${pkgs.python3}/bin/python3 ${./toggle-tv.py} on";
+    powerDownCommands = "${pkgs.python3}/bin/python3 ${./toggle-tv.py} off";
+  };
 
   #### Networking ##############################################################
 

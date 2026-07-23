@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""Wake the Hisense VIDAA TV by sending KEY_POWER over its local MQTT broker.
+"""Toggle the Hisense VIDAA TV's power over its local MQTT broker.
 
-The gaming PC's resume-from-suspend hook runs this (see pc/configuration.nix),
-so the TV comes on with the PC instead of needing its own remote. Zero
-dependencies: Python standard library only -- it hand-rolls the little bit of
-MQTT it needs rather than pulling in a client library.
+Usage: toggle-tv.py {on,off}
+
+The gaming PC's resume and suspend hooks run this (see pc/configuration.nix),
+so the TV's power follows the PC's: on with the machine, standby with it,
+instead of needing its own remote. Zero dependencies: Python standard library
+only -- it hand-rolls the little bit of MQTT it needs rather than pulling in a
+client library.
 
 State-aware: it asks the TV for its power state first and only sends KEY_POWER
-when the TV is actually in standby. KEY_POWER is a toggle, so a blind press
-would switch OFF a TV that is already on (e.g. still showing the PC's input
-from before the PC slept); the state check avoids that.
+when the TV is not already in the intended state. KEY_POWER is a toggle, so a
+blind press would flip a TV that is already where it should be to exactly the
+wrong state. A standby TV answers a state query with silence, so the two
+directions must read silence oppositely: "on" takes it as the standby
+signature and sends the key, while "off" takes it as unknown and does nothing,
+since a blind toggle there could wake a TV that was off all along.
 
 The reverse-engineered credential algorithm, the imperative host setup this
 needs (the /var/lib/vidaa client certificate), and the whole investigation
@@ -34,7 +40,12 @@ TV_MAC = "c4:08:26:aa:b4:c3"  # the TV's own MAC (from its UPnP descriptor);
 CERT = "/var/lib/vidaa/vidaa_client.pem"  # the VIDAA app's client certificate
 KEY = "/var/lib/vidaa/vidaa_client.key"  # ... and its private key (mutual TLS)
 
-CONNECT_RETRIES = 20  # ~20 s budget, to ride out WiFi reassociation on resume
+# Connection retry budget, per direction. "on" runs right after resume, when
+# WiFi is still reassociating, so it gets ~20 s. "off" runs just before
+# suspend on a network that is already up -- and since systemd puts no timeout
+# on it there (it is sleep-actions' start phase, which the suspend waits on),
+# this small budget is the only bound on how long it can delay the suspend.
+CONNECT_RETRIES = {"on": 20, "off": 2}
 STATE_WAIT = 3.0  # seconds to wait for the TV to report its power state
 
 # ---------------------------- Dynamic credentials ----------------------------
@@ -140,7 +151,7 @@ def _read_packet(sock):
     return head[0], body
 
 
-# --------------------------------- Wake logic --------------------------------
+# -------------------------------- Toggle logic --------------------------------
 #
 # {c} is the dynamic client-id, which in our token-less setup is also the
 # MQTT-level client-id (see pc/WAKING.md).
@@ -160,10 +171,10 @@ def _tls_context():
     return ctx
 
 
-def _connect(ctx):
+def _connect(ctx, retries):
     """Open a TLS socket and complete an MQTT CONNECT, retrying network lag."""
     client_id, username, password = make_creds(TV_MAC)
-    for _ in range(CONNECT_RETRIES):
+    for _ in range(retries):
         try:
             raw = socket.create_connection((TV_HOST, TV_PORT), timeout=5)
             sock = ctx.wrap_socket(raw, server_hostname=TV_HOST)
@@ -173,14 +184,16 @@ def _connect(ctx):
                 return sock, client_id  # CONNACK, return code 0 = accepted
             rc = body[1] if body and len(body) >= 2 else "?"
             sock.close()
-            sys.exit(f"wake-tv: MQTT CONNECT refused (return code {rc})")
+            sys.exit(f"toggle-tv: MQTT CONNECT refused (return code {rc})")
         except (OSError, ssl.SSLError):
             time.sleep(1)  # network likely not up yet after resume; retry
     return None, None
 
 
-def _tv_asleep(sock, client_id):
-    """Return True if the TV is in standby (or unresponsive), False if it's on."""
+def _tv_state(sock, client_id):
+    """Ask the TV for its power state: "on", "standby", or None if it stayed
+    silent. The TV answers promptly when on and not at all in standby; what to
+    make of the silence is the caller's, direction-dependent, call."""
     sock.sendall(_subscribe_packet(_T_STATE))
     sock.sendall(_publish_packet(_T_GETSTATE.format(c=client_id), ""))
     deadline = time.time() + STATE_WAIT
@@ -207,22 +220,39 @@ def _tv_asleep(sock, client_id):
         statetype = state.get("statetype")
         if statetype:
             # "fake_sleep_0" is standby; any other state means the TV is on.
-            return statetype == "fake_sleep_0"
-    # No state within the window. The TV answers promptly when on and stays
-    # silent in standby, so read silence as "asleep" and wake it.
-    return True
+            return "standby" if statetype == "fake_sleep_0" else "on"
+    return None
 
 
 def main():
-    sock, client_id = _connect(_tls_context())
+    mode = sys.argv[1] if len(sys.argv) == 2 else None
+    if mode not in ("on", "off"):
+        sys.exit("usage: toggle-tv.py {on,off}")
+
+    sock, client_id = _connect(_tls_context(), CONNECT_RETRIES[mode])
     if sock is None:
-        sys.exit("wake-tv: TV unreachable after retries; giving up")
+        if mode == "off":
+            # A deliberate no-op, not an error: an unreachable TV has nothing
+            # to switch off, and the suspend must not be held up over it.
+            print("toggle-tv: TV unreachable, leaving it be")
+            return
+        sys.exit("toggle-tv: TV unreachable after retries; giving up")
     try:
-        if _tv_asleep(sock, client_id):
-            sock.sendall(_publish_packet(_T_SENDKEY.format(c=client_id), "KEY_POWER"))
-            print("wake-tv: TV asleep, sent KEY_POWER")
+        state = _tv_state(sock, client_id)
+        if mode == "on":
+            if state != "on":  # standby, or the silence that stands for it
+                sock.sendall(_publish_packet(_T_SENDKEY.format(c=client_id), "KEY_POWER"))
+                print("toggle-tv: TV asleep, sent KEY_POWER")
+            else:
+                print("toggle-tv: TV already on, nothing to do")
         else:
-            print("wake-tv: TV already on, nothing to do")
+            if state == "on":  # and only then -- silence must not be toggled
+                sock.sendall(_publish_packet(_T_SENDKEY.format(c=client_id), "KEY_POWER"))
+                print("toggle-tv: TV on, sent KEY_POWER")
+            elif state == "standby":
+                print("toggle-tv: TV already off, nothing to do")
+            else:
+                print("toggle-tv: TV state unknown, leaving it alone")
         try:
             sock.sendall(bytes([0xE0, 0x00]))  # MQTT DISCONNECT
         except OSError:
