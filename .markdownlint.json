@@ -1,0 +1,19 @@
+{
+  "descriptive-link-text": false,
+  "emphasis-style": {
+    "style": "underscore"
+  },
+  "first-line-heading": false,
+  "heading-increment": false,
+  "line-length": false,
+  "no-alt-text": false,
+  "no-bare-urls": false,
+  "no-emphasis-as-heading": false,
+  "no-duplicate-heading": false,
+  "no-inline-html": false,
+  "no-space-in-emphasis": false,
+  "strong-style": {
+    "style": "asterisk"
+  },
+  "table-column-count": false
+}

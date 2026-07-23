@@ -230,6 +230,17 @@
     ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:02:00.0", ATTR{power/wakeup}="enabled"
   '';
 
+  # Wake the TV whenever the PC resumes, so it comes on with the machine. A
+  # consumer GPU has no HDMI-CEC, so the TV cannot be woken over the HDMI cable
+  # the way a console does it; instead this publishes KEY_POWER to the TV's
+  # local MQTT broker (which stays alive in its standby) over mutual TLS. The
+  # script is standard-library-only, so a bare python3 runs it -- nothing is
+  # added to systemPackages. It reads its client certificate from
+  # /var/lib/vidaa (imperative host state) and retries the connection to ride
+  # out WiFi reassociation after resume; it is state-aware, so it never toggles
+  # off a TV that is already on. Full story and one-time setup: pc/WAKING.md.
+  powerManagement.resumeCommands = "${pkgs.python3}/bin/python3 ${./wake-tv.py}";
+
   #### Networking ##############################################################
 
   networking = {
