@@ -105,10 +105,14 @@ pkgs.buildEnv {
     pkgs.starship
     pkgs.tokei
 
-    # Nix tooling
+    # Nix tooling. nixos-rebuild-ng deploys the PC's NixOS from this Mac over
+    # SSH (`just pc-deploy`): evaluation happens locally (it is pure and
+    # platform-independent), the build and activation on the PC. Despite the
+    # -ng attribute name, the binary it installs is plain `nixos-rebuild`.
     pkgs.nixd
     pkgs.nixfmt
     pkgs.statix
     pkgs.deadnix
+    pkgs.nixos-rebuild-ng
   ];
 }

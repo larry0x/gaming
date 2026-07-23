@@ -29,9 +29,13 @@ pc-install:
   sudo nixos-generate-config --root /mnt --show-hardware-config > pc/hardware-configuration.nix
   sudo nixos-install --flake .#gaming --no-root-passwd
 
-# Rebuild NixOS
+# Rebuild NixOS (run on the PC itself)
 pc-rebuild:
   sudo nixos-rebuild switch --flake .#gaming
+
+# Deploy NixOS to the PC from this Mac: evaluate here, build + activate there over SSH
+pc-deploy:
+  nixos-rebuild switch --flake .#gaming --target-host gaming --build-host gaming --elevate sudo --ask-elevate-password
 
 # ------------------------------------ Mac -------------------------------------
 
