@@ -33,9 +33,15 @@ pc-install:
 pc-rebuild:
   sudo nixos-rebuild switch --flake .#gaming
 
+# --no-reexec skips nixos-rebuild's self-update step, which re-execs into the
+# copy of itself pinned by the target flake -- the PC's x86_64-linux build,
+# which macOS can never execute (it warned and fell back on every deploy).
+# The step's purpose, keeping tool and system in version lockstep, is already
+# guaranteed here by the shared flake.lock.
+#
 # Deploy NixOS to the PC from this Mac: evaluate here, build + activate there over SSH
 pc-deploy:
-  nixos-rebuild switch --flake .#gaming --target-host gaming --build-host gaming --elevate sudo --ask-elevate-password
+  nixos-rebuild switch --flake .#gaming --target-host gaming --build-host gaming --elevate sudo --ask-elevate-password --no-reexec
 
 # ------------------------------------ Mac -------------------------------------
 
